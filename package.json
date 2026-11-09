@@ -1,0 +1,22 @@
+{
+  "name": "moodle-activity-connector",
+  "version": "1.0.0",
+  "description": "Read-only Moodle MCP connector and email digest runner",
+  "scripts": {
+    "test": "node --test",
+    "start": "node --env-file=.env server.mjs",
+    "digest": "node --env-file=.env digest.mjs"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "private": true,
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "html-to-text": "10.0.1",
+    "nodemailer": "10.4.0",
+    "zod": "4.6.7"
+  },
+  "license": "MIT"
+}
