@@ -55,7 +55,7 @@ async function configure() {
       }
     }
     if (process.platform !== 'win32') await chmod(env, 0o600);
-    console.log('\n1. I have a Moodle Security key.\n2. Use browser sign-in (requires Google Chrome).');
+    console.log('\n1. I have a Moodle Security key.\n2. Use browser sign-in (opens your default browser).');
     const option = (await rl.question('Choose 1 or 2: ')).trim();
     if (!['1', '2'].includes(option)) throw new Error('Choose 1 or 2. Run setup again to continue.');
     useBrowser = option === '2';

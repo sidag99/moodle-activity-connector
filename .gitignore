@@ -4,3 +4,4 @@
 node_modules/
 .digest-state/
 .DS_Store
+moodle-callback-app-*/

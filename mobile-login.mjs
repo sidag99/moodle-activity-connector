@@ -1,13 +1,11 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseEnv } from 'node:util';
-import { chromium } from 'playwright-core';
+import { makeHandoff, openDefaultBrowser } from './browser-handoff.mjs';
 import { client } from './moodle.mjs';
 
-const scheme = 'moodle-activity-connector';
 const configFile = new URL('./.env', import.meta.url);
 
 export function moodleHome(value) {
@@ -20,21 +18,23 @@ export function moodleHome(value) {
   return home;
 }
 
-export function mobileLaunch(home, launchUrl, passport) {
+export function mobileLaunch(home, launchUrl, passport, scheme) {
   const endpoint = new URL(launchUrl ?? 'admin/tool/mobile/launch.php', home);
   const expected = new URL('admin/tool/mobile/launch.php', home);
   if (endpoint.origin !== expected.origin || endpoint.pathname !== expected.pathname ||
       endpoint.username || endpoint.password || endpoint.hash) {
     throw new Error('The site announced a mobile login endpoint outside its Moodle installation.');
   }
-  endpoint.search = new URLSearchParams({ service: 'moodle_mobile_app', passport, urlscheme: scheme });
+  endpoint.search = new URLSearchParams({ service: 'moodle_mobile_app', passport, urlscheme: scheme, confirmed: '1' });
   return endpoint;
 }
 
-export function parseCallback(location, home, passport) {
+export function parseCallback(location, home, passport, scheme) {
   const prefix = scheme + '://token=';
   if (!location?.startsWith(prefix)) return null;
-  const payload = location.slice(prefix.length);
+  let payload;
+  try { payload = decodeURIComponent(location.slice(prefix.length)); }
+  catch { throw new Error('The Moodle callback did not match this sign-in.'); }
   const [siteId, token] = /^[A-Za-z0-9+/=]{20,512}$/.test(payload)
     ? Buffer.from(payload, 'base64').toString('utf8').split(':::') : [];
   // Moodle binds the handoff to its canonical base URL and this attempt's one-time passport.
@@ -63,49 +63,34 @@ async function publicConfig(home) {
   return result.data;
 }
 
-async function browserSignIn(home, endpoint, passport) {
-  const profile = await mkdtemp(join(tmpdir(), 'moodle-login-'));
-  let browser, timer;
+async function browserSignIn(home, endpoint, passport, scheme) {
+  const cancelled = new AbortController();
+  const cancel = () => cancelled.abort();
+  process.once('SIGINT', cancel);
+  process.once('SIGTERM', cancel);
+  let callback;
   try {
-    browser = await chromium.launchPersistentContext(profile, { channel: 'chrome', headless: false });
-    const page = browser.pages()[0] ?? await browser.newPage();
-    const cdp = await browser.newCDPSession(page);
-    const handoff = new Promise((done, fail) => {
-      timer = setTimeout(() => fail(new Error('Sign-in timed out. Please retry.')), 12 * 60 * 1000);
-      page.once('close', () => fail(new Error('Sign-in window was closed.')));
-      cdp.on('Fetch.requestPaused', async event => {
-        const { requestId } = event;
-        const request = new URL(event.request.url);
-        const location = event.responseHeaders?.find(h => h.name.toLowerCase() === 'location')?.value;
-        if (request.origin !== endpoint.origin || request.pathname !== endpoint.pathname ||
-            !/^[a-z][a-z0-9+.-]*:\/\/token=/i.test(location ?? '')) {
-          await cdp.send('Fetch.continueResponse', { requestId }).catch(() => {});
-          return;
-        }
-        try {
-          const token = parseCallback(location, home, passport);
-          if (!token) throw new Error('The institution forced a different app callback. Ask its Moodle support for an approved connection.');
-          await cdp.send('Fetch.fulfillRequest', { requestId, responseCode: 200,
-            responseHeaders: [{ name: 'Content-Type', value: 'text/plain; charset=utf-8' },
-              { name: 'Cache-Control', value: 'no-store' }],
-            body: Buffer.from('Sign-in received. Checking read access…').toString('base64') });
-          done(token);
-        } catch (error) {
-          await cdp.send('Fetch.failRequest', { requestId, errorReason: 'Aborted' }).catch(() => {});
-          fail(error);
-        }
-      });
-    });
-    handoff.catch(() => {});
-    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: endpoint.origin + endpoint.pathname + '*',
-      resourceType: 'Document', requestStage: 'Response' }] });
-    console.log('Sign in using your normal school account in the separate Chrome window.');
-    void page.goto(endpoint.href, { waitUntil: 'commit', timeout: 0 }).catch(() => {});
-    return await handoff;
+    callback = await makeHandoff(scheme);
+    await openDefaultBrowser(endpoint);
+    console.log('Sign in to Moodle in your default browser.');
+    console.log('If Moodle shows a launch link, click it. If prompted, open Moodle Activity Connector.');
+    const signal = AbortSignal.any([cancelled.signal, AbortSignal.timeout(12 * 60 * 1000)]);
+    for (;;) {
+      const link = await callback.receive(signal);
+      // A malformed or stale handoff must not interrupt the real sign-in.
+      try {
+        const token = parseCallback(link, home, passport, scheme);
+        if (token) return token;
+      } catch { /* Ignore unrecognized callbacks without logging their contents. */ }
+    }
+  } catch (error) {
+    if (error.name === 'TimeoutError' || error.cause?.name === 'TimeoutError') throw new Error('Sign-in timed out. Retry, then open the app link when prompted.');
+    if (error.name === 'AbortError') throw new Error('Sign-in was cancelled.');
+    throw error;
   } finally {
-    clearTimeout(timer);
-    await browser?.close().catch(() => {});
-    await rm(profile, { recursive: true, force: true }).catch(() => {});
+    await callback?.close().catch(() => {});
+    process.removeListener('SIGINT', cancel);
+    process.removeListener('SIGTERM', cancel);
   }
 }
 
@@ -131,9 +116,10 @@ async function main() {
   const settings = parseEnv(await readFile(configFile, 'utf8'));
   const home = moodleHome(settings[exam ? 'MOODLE_EXAM_URL' : 'MOODLE_URL']);
   const passport = randomBytes(24).toString('hex');
+  const scheme = 'moodle-link-' + randomBytes(8).toString('hex');
   const config = await publicConfig(home);
-  const endpoint = mobileLaunch(home, config.launchurl, passport);
-  const token = await browserSignIn(home, endpoint, passport);
+  const endpoint = mobileLaunch(home, config.launchurl, passport, scheme);
+  const token = await browserSignIn(home, endpoint, passport, scheme);
   const call = client({ base: home.href, token });
   const profile = await call('core_webservice_get_site_info');
   if (!Number(profile.userid)) throw new Error('Moodle did not verify an authenticated account.');
@@ -146,9 +132,9 @@ async function main() {
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   main().catch(error => {
-    // Never log Playwright errors, browser URLs, handoff contents, or raw HTTP responses.
-    const safe = /^(Set the Moodle home|Use an HTTPS|The site announced|This site (did not|does not)|Moodle (did not|public configuration)|Sign-in (window|timed)|The (Moodle callback|institution forced)|Usage:|core_)/;
-    console.error(safe.test(error.message) ? error.message : 'Sign-in failed. Check that .env exists, Google Chrome is installed, and your Moodle site is reachable.');
+    // Never log browser URLs, handoff contents, or raw HTTP responses.
+    const safe = /^(Set the Moodle home|Use an HTTPS|The site announced|This site (did not|does not)|Moodle (did not|public configuration)|Sign-in (was cancelled|timed)|The (Moodle callback|institution forced)|Could not register|Usage:|core_)/;
+    console.error(safe.test(error.message) ? error.message : 'Sign-in failed. Check that .env exists, you have a desktop browser set as default, and your Moodle site is reachable.');
     process.exitCode = 1;
   });
 }

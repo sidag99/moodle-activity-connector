@@ -20,8 +20,5 @@
     "nodemailer": "10.4.0",
     "zod": "4.6.7"
   },
-  "license": "MIT",
-  "devDependencies": {
-    "playwright-core": "1.65.0"
-  }
+  "license": "MIT"
 }

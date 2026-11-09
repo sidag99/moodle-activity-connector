@@ -49,13 +49,13 @@ chmod 600 .env
 
 Open `.env` locally in your text editor and set `MOODLE_URL` to your Moodle home URL and, if you have a security key, set `MOODLE_TOKEN`. Include the installation path if Moodle lives in a subdirectory. For TU Darmstadt, use `https://moodle.tu-darmstadt.de/`; if authorized separately, the exam URL is `https://moodle-exam.tu-darmstadt.de/`.
 
-**Browser sign-in instead:** If your institution allows browser-based Moodle mobile login, leave `MOODLE_TOKEN` blank. With Google Chrome installed, run:
+**Browser sign-in instead:** If your institution allows browser-based Moodle mobile login, leave `MOODLE_TOKEN` blank. Run:
 
 ```sh
 npm run login
 ```
 
-Sign in to your institution in the temporary Chrome window. The CLI checks read access and saves the web service token to your local `.env` file. It does not take your password, read browser cookies, or use an existing Chrome profile. The window closes after sign-in. Repeat the command if the token expires. If the site uses a forced app callback or doesn't support this flow, use an authorized security key or ask your institution for access. If you have a separate exam URL, the equivalent command is `npm run login -- --exam`.
+Sign in to your institution in your default browser. If Moodle shows a launch link, click it. If your browser asks whether to open Moodle Activity Connector, allow it to complete this sign-in. The helper temporarily registers a local app link, validates the callback, then checks read access and saves the web service token to your local `.env` file. It does not read your password or browser cookies. No browser automation or extension is required. The helper supports macOS, Windows, and desktop Linux (with `xdg-open` and `xdg-mime`); only macOS has been tested end to end so far. Repeat the command if the token expires. If the site uses a forced app callback or doesn't support this flow, use an authorized security key or ask your institution for access. If you have a separate exam URL, the equivalent command is `npm run login -- --exam`.
 
 Check coverage with:
 
