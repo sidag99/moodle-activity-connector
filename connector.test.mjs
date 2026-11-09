@@ -28,6 +28,7 @@ test('scan joins Moodle course-module IDs, pages Timeline, filters closed work a
       case 'core_webservice_get_site_info': return { userid: 9 };
       case 'core_enrol_get_users_courses': return [course];
       case 'core_calendar_get_action_events_by_timesort':
+        assert.ok(args.timesortfrom > 0, 'Moodle needs a nonzero lower bound to apply the cursor');
         if (!args.aftereventid) return { lastid: 3, events: [
           event(1, 11, 'assign', 'due', now - 3600),
           event(2, 12, 'quiz', 'open', now - 3600),

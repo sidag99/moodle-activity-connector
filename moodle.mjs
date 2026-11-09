@@ -105,7 +105,8 @@ async function timeline(call) {
   let cursor = 0;
   for (let i = 0; i < 200; i++) {
     const page = await call('core_calendar_get_action_events_by_timesort', {
-      timesortfrom: 0, aftereventid: cursor, limitnum: 50, limittononsuspendedevents: 1,
+      // Moodle ignores the cursor when timesortfrom is zero.
+      timesortfrom: 1, aftereventid: cursor, limitnum: 50, limittononsuspendedevents: 1,
     });
     const items = array(page.events, 'Moodle Timeline');
     if (!items.length) return events;
