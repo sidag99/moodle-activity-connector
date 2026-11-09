@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --test",
     "start": "node --env-file=.env server.mjs",
-    "digest": "node --env-file=.env digest.mjs"
+    "digest": "node --env-file=.env digest.mjs",
+    "login": "node mobile-login.mjs"
   },
   "type": "module",
   "engines": {
@@ -18,5 +19,8 @@
     "nodemailer": "10.4.0",
     "zod": "4.6.7"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "playwright-core": "1.65.0"
+  }
 }

@@ -1,12 +1,12 @@
 # Moodle Activity Connector
 
-A read-only Moodle connector for ChatGPT and other MCP clients, with an optional daily email digest. It finds active assignments, quizzes and other activities that Moodle exposes, with course names, deadlines, descriptions and links. Each person runs their own copy and uses an authorized token for their own account.
+A read-only Moodle connector for ChatGPT and other MCP clients, with an optional daily email digest. It finds active assignments, quizzes and other activities that Moodle exposes, with course names, deadlines, descriptions and links. Each person runs their own copy and signs in using a Moodle security key or a supported browser-based mobile sign-in.
 
 This project is independent of Moodle, OpenAI and TU Darmstadt. See [the publication plan](docs/publication.md) for what a hosted directory plugin would require.
 
 ## 1. Get authorized Moodle access
 
-Sign in to your school's Moodle and check **Preferences → Security keys**. If you don't have a key for an appropriate web service, ask your Moodle administrator for a REST token with the read permissions below. Keep your token out of chats, command-line arguments and shared files.
+**Security key:** Sign in to your school's Moodle and check **Preferences → Security keys**. If you don't have a key for an appropriate web service, ask your Moodle administrator for a REST token with the read permissions below. Keep your token out of chats, command-line arguments and shared files.
 
 The [Moodle web service guide](https://docs.moodle.org/502/en/Using_web_services) explains how administrators configure REST services and issue tokens. If support asks which functions are needed, send this list:
 
@@ -31,7 +31,17 @@ cp -n .env.example .env
 chmod 600 .env
 ```
 
-Open `.env` locally in your text editor and set `MOODLE_URL` to your Moodle home URL and fill in `MOODLE_TOKEN`. Include the installation path if Moodle lives in a subdirectory. For TU Darmstadt, use `https://moodle.tu-darmstadt.de/`; if authorized separately, the exam URL is `https://moodle-exam.tu-darmstadt.de/`. Then run:
+Open `.env` locally in your text editor and set `MOODLE_URL` to your Moodle home URL and, if you have a security key, set `MOODLE_TOKEN`. Include the installation path if Moodle lives in a subdirectory. For TU Darmstadt, use `https://moodle.tu-darmstadt.de/`; if authorized separately, the exam URL is `https://moodle-exam.tu-darmstadt.de/`.
+
+**Browser sign-in instead:** If your institution allows browser-based Moodle mobile login, leave `MOODLE_TOKEN` blank. With Google Chrome installed, run:
+
+```sh
+npm run login
+```
+
+Sign in to your institution in the temporary Chrome window. The CLI checks read access and saves the web service token to your local `.env` file. It does not take your password, read browser cookies, or use an existing Chrome profile. The window closes after sign-in. Repeat the command if the token expires. If the site uses a forced app callback or doesn't support this flow, use an authorized security key or ask your institution for access. If you have a separate exam URL, the equivalent command is `npm run login -- --exam`.
+
+Check coverage with:
 
 ```sh
 npm run digest -- --preview
