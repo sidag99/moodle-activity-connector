@@ -6,7 +6,8 @@
     "test": "node --test",
     "start": "node --env-file=.env server.mjs",
     "digest": "node --env-file=.env digest.mjs",
-    "login": "node mobile-login.mjs"
+    "login": "node mobile-login.mjs",
+    "setup": "node setup.mjs"
   },
   "type": "module",
   "engines": {

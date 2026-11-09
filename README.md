@@ -4,6 +4,22 @@ A read-only Moodle connector for ChatGPT and other MCP clients, with an optional
 
 This project is independent of Moodle, OpenAI and TU Darmstadt. See [the publication plan](docs/publication.md) for what a hosted directory plugin would require.
 
+## Quick setup for local use
+
+In the extracted or cloned folder, run these commands with Node.js 22 or later:
+
+```sh
+npm ci
+npm run setup
+```
+
+Enter your school's Moodle URL and choose **Security key** or **browser sign-in**. The wizard saves settings on your computer and prints the exact connection fields for ChatGPT desktop and Claude's local clients. It does not modify either client's settings. To print the fields again, run `npm run setup -- --print`.
+
+- **ChatGPT desktop:** Add the printed STDIO server in **Settings → MCP servers**. See the [desktop MCP guide](https://learn.chatgpt.com/docs/extend/mcp#configure-in-the-chatgpt-desktop-app).
+- **Claude Desktop:** Merge the printed JSON into your existing local MCP configuration; keep any other servers already there. Follow the [Claude Desktop guide](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop). For Claude Code, follow the [JSON import instructions](https://code.claude.com/docs/en/mcp#add-a-server-from-an-mcpservers-json-block).
+
+Your own computer runs the connector. No hosted service or publisher account is required. Local setup does not install a web connector.
+
 ## 1. Get authorized Moodle access
 
 **Security key:** Sign in to your school's Moodle and check **Preferences → Security keys**. If you don't have a key for an appropriate web service, ask your Moodle administrator for a REST token with the read permissions below. Keep your token out of chats, command-line arguments and shared files.
